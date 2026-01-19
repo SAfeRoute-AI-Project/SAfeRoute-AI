@@ -167,14 +167,17 @@ class _RealtimeMapState extends State<RealtimeMap> {
             //NUOVO LAYER HOTSPOTS AI
             if (areHotspotsVisible)
               CircleLayer(
-                circles: riskHotspots.map((hotspot) {
+                circles: riskHotspots.where((hotspot) {
+                  final type = hotspot.type?.toString().toLowerCase() ?? '';
+                  return type != 'malessere';
+                }).map((hotspot) {
                   return CircleMarker(
                     point: LatLng(hotspot.centerLat, hotspot.centerLng),
                     color: Colors.red.withValues(alpha: 0.3),
                     borderColor: Colors.red,
                     borderStrokeWidth: 2,
                     useRadiusInMeter: true,
-                    radius: hotspot.radiusKm * 1000, //Converte km in metri
+                    radius: hotspot.radiusKm * 1000,
                   );
                 }).toList(),
               ),

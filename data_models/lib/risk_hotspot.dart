@@ -9,8 +9,8 @@ class RiskHotspot {
   final double centerLng;
   final int size; // Numero di eventi storici nel cluster (densità del rischio)
   final double radiusKm;
-  final DateTime?
-  lastUpdated; // Opzionale, data dell'ultimo ricalcolo del cluster
+  final DateTime? lastUpdated; // Opzionale, data dell'ultimo ricalcolo del cluster
+  final String? type;
 
   // Costruttore principale.
   // Richiede tutti i parametri essenziali per definire geometricamente l'hotspot.
@@ -21,6 +21,7 @@ class RiskHotspot {
     required this.size,
     required this.radiusKm,
     this.lastUpdated,
+    this.type,
   });
 
   // Deserializzazione (da JSON a Model): Factory per ricostruire l'oggetto da una Map JSON.
@@ -57,6 +58,8 @@ class RiskHotspot {
       lastUpdated: json['last_updated'] != null
           ? DateTime.tryParse(json['last_updated'].toString())
           : null,
+
+      type: json['type']?.toString(),
     );
   }
 
@@ -69,6 +72,7 @@ class RiskHotspot {
       'size': size,
       'radius_km': radiusKm,
       'last_updated': lastUpdated?.toIso8601String(),
+      'type': type,
     };
   }
 }

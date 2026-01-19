@@ -75,7 +75,7 @@ class ReportProvider extends ChangeNotifier {
 
     for (var item in _emergencies) {
       // Ignora i report "SAFE" per il banner delle emergenze vicine
-      if (item['type'] == 'SAFE') continue;
+      if (item['type'] || item['type']== 'SAFE') continue;
 
       final double? eLat = (item['lat'] as num?)?.toDouble();
       final double? eLng = (item['lng'] as num?)?.toDouble();
