@@ -1,12 +1,15 @@
+import time
+from contextlib import asynccontextmanager
+
+import networkx as nx
+import osmnx as ox
 import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import osmnx as ox
-import time # MODIFICA: Necessario per misurare i tempi di esecuzione
+from pydantic import BaseModel
+
+from algorithms import bidirectional_dijkstra
 from enviroment import SafeGuardEnv
-from algorithms import standard_dijkstra, bidirectional_dijkstra # MODIFICA: Importiamo le tue pipeline
 
 # Inizializzazione dell'ambiente SafeGuard
 env = SafeGuardEnv()
@@ -42,11 +45,7 @@ async def get_sorted_points(req: UserLocation):
         punti_top = sorted(punti, key=lambda x: x['bird_distance'])[:5]
         results = []
 
-        # MODIFICA: Prepariamo il grafo non orientato per il bidirezionale (una sola volta)
-        # MODIFICA: Prepariamo il grafo non orientato
         G_undirected = env.graph.to_undirected()
-
-        # ... (restante codice invariato fino al ciclo for) ...
 
         for p in punti_top:
             target_node = ox.nearest_nodes(env.graph, X=p['lng'], Y=p['lat'])
@@ -59,41 +58,28 @@ async def get_sorted_points(req: UserLocation):
                         return min(d.get('final_weight', d['length']) for d in edge_data.values())
                     return 1e9
 
-                # 2. Pipeline Baseline (Distanza Reale)
+                # 2. Pipeline Baseline (Distanza Reale) - Ora chiediamo anche il PATH
                 start_t1 = time.perf_counter()
-                dist_r = standard_dijkstra(G_undirected, user_node, target_node, 'length')
+                # Usiamo nx.shortest_path per avere i nodi
+                path_nodes_r = nx.shortest_path(G_undirected, user_node, target_node, weight='length')
+                dist_r = nx.path_weight(G_undirected, path_nodes_r, weight='length')
                 exec_time_1 = time.perf_counter() - start_t1
 
-                # 3. Pipeline Ricerca (Tua Bidirezionale)
+                # 3. Pipeline Ricerca (Tua Bidirezionale) - Deve restituire (distanza, path)
                 start_t2 = time.perf_counter()
-                dist_w = bidirectional_dijkstra(G_undirected, user_node, target_node, weight_ia)
+                dist_w, path_nodes_w = bidirectional_dijkstra(G_undirected, user_node, target_node, weight_ia)
                 exec_time_2 = time.perf_counter() - start_t2
 
-                # --- LOGICA DI CONFRONTO ---
+                # Trasforma gli ID dei nodi in [[lat, lng], [lat, lng], ...]
+                def nodes_to_coords(nodes):
+                    return [[env.graph.nodes[n]['y'], env.graph.nodes[n]['x']] for n in nodes]
+
+                # Logica di confronto
                 is_blocked = dist_w > 50000
                 is_dangerous = dist_w > (dist_r + 10.0)
 
-                status_icon = "⚠️" if is_dangerous else "✅"
-
-                # MODIFICA: Stampa potenziata con Distanze e Tempi
-                print(f"📍 {p['name'][:15]} | "
-                      f"Dist.Reale: {dist_r:7.1f}m | Dist.IA: {dist_w:7.1f}m | "
-                      f"T.Std: {exec_time_1:.5f}s | T.Bidir: {exec_time_2:.5f}s | {status_icon}")
-
-                # Determine text status
-                status_text = "⚠️ PERICOLO" if is_dangerous else "✅ SICURO"
-
-                print(f"\n📊 RISULTATO ANALISI:")
-                print(f"   - Reale (senza ostacoli): {dist_r:.0f} m")
-                print(f"   - IA (con ostacoli):      {dist_w:.0f} m")
-                print(f"   - Differenza:             {dist_w - dist_r:.0f} m")
-                print(f"   - Tempo Standard:         {exec_time_1:.5f} s")
-                print(f"   - Tempo Bidirezionale:    {exec_time_2:.5f} s")
-                print(f"   - Status:                 {status_text}")
-                if is_blocked:
-                    print(f"   - Note:                   🚫 BLOCCATO (> 50km)")
-                elif is_dangerous:
-                    print(f"   - Note:                   ⚠️ DEVIAZIONE RILEVATA")
+                # Prepariamo le polilinee da mandare a Flutter
+                polyline_to_send = nodes_to_coords(path_nodes_w) if not is_blocked else []
 
                 results.append({
                     "title": str(p.get('name', 'N/A')),
@@ -104,15 +90,13 @@ async def get_sorted_points(req: UserLocation):
                     "dist_real": float(dist_r),
                     "isDangerous": bool(is_dangerous),
                     "isBlocked": bool(is_blocked),
+                    "polyline": polyline_to_send,
                     "exec_time_baseline": exec_time_1,
                     "exec_time_research": exec_time_2
                 })
-
             except Exception as e:
                 print(f"❗ Errore su {p['name']}: {e}")
                 continue
-
-        # ... (restante codice invariato) ...
 
         print("--- 🏁 FINE DEBUG ---\n")
         results.sort(key=lambda x: x['distance'])
