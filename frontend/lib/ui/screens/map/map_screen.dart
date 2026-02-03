@@ -22,6 +22,7 @@ class _MapScreenState extends State<MapScreen> {
 
   // Lista filtrata e ordinata da mostrare
   List<Map<String, dynamic>> _nearestPoints = [];
+  List<List<double>>? _selectedPolyline;
 
   bool _isLoadingList = true;
   String? _errorList;
@@ -205,7 +206,6 @@ class _MapScreenState extends State<MapScreen> {
       ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
-        print("RISPOSTA DA PYTHON: ${response.body}");
         final List<dynamic> data = json.decode(response.body);
 
         if (mounted) {
@@ -228,8 +228,9 @@ class _MapScreenState extends State<MapScreen> {
                 'distance': dEffettiva,
                 'dist_real': dReale,
                 'isDangerous': pericoloso,
-                'isBlocked': bloccato, // <--- AGGIUNTO
+                'isBlocked': bloccato,
                 'type': e['type']?.toString() ?? 'generic',
+                'polyline': e['polyline'],
 
                 // Logica sottotitolo
                 'subtitle': bloccato
@@ -279,6 +280,8 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           Positioned.fill(
             child: RealtimeMap(
+              selectedPolyline: _selectedPolyline,
+              isSelectionMode: false,
               onCenterPressed: () async {
                 // Otteniamo la posizione attuale e forziamo il ricalcolo
                 Position currentPos = await Geolocator.getCurrentPosition();
@@ -456,6 +459,24 @@ class _MapScreenState extends State<MapScreen> {
                                       : (isDangerous ? const BorderSide(color: Colors.white, width: 1) : BorderSide.none),
                                 ),
                                 child: ListTile(
+                                  onTap: () {
+                                    setState(() {
+                                      // Conversione sicura da JSON a List<List<double>>
+                                      if (item['polyline'] != null) {
+                                        _selectedPolyline = (item['polyline'] as List).map((dynamic point) {
+                                          return (point as List).map((dynamic coord) {
+                                            return (coord as num).toDouble();
+                                          }).toList();
+                                        }).toList();
+                                      } else {
+                                        _selectedPolyline = [];
+                                      }
+                                    });
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("Visualizzazione percorso per: ${item['title']}")),
+                                    );
+                                  },
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                                   leading: CircleAvatar(
                                     backgroundColor: iconBgColor,

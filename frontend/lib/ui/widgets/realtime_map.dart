@@ -14,12 +14,14 @@ class RealtimeMap extends StatefulWidget {
   final bool isSelectionMode;
   final Function(LatLng)? onLocationPicked;
   final VoidCallback? onCenterPressed;
+  final List<List<double>>? selectedPolyline;
 
   const RealtimeMap({
     super.key,
     this.isSelectionMode = false, // Default false: comportamento normale
     this.onLocationPicked,
     this.onCenterPressed,
+    this.selectedPolyline,
   });
   @override
   State<RealtimeMap> createState() => _RealtimeMapState();
@@ -143,6 +145,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
     final isRescuer = authProvider.isRescuer;
     final currentUserId = authProvider.currentUser?.id?.toString();
 
+    debugPrint("REALTIME_MAP: Ricevuti ${widget.selectedPolyline?.length ?? 0} punti per la polilinea.");
     return Stack(
       children: [
         FlutterMap(
@@ -164,7 +167,20 @@ class _RealtimeMapState extends State<RealtimeMap> {
               userAgentPackageName: 'com.safeguard.frontend',
             ),
 
-            //NUOVO LAYER HOTSPOTS AI
+            if (widget.selectedPolyline != null && widget.selectedPolyline!.isNotEmpty)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: widget.selectedPolyline!
+                        .map((p) => LatLng(p[0], p[1]))
+                        .toList(),
+                    color: Colors.blueAccent,
+                    strokeWidth: 5.0,
+                  ),
+                ],
+              ),
+
+            //Nuovo layer hotspot AI
             if (areHotspotsVisible)
               CircleLayer(
                 circles: riskHotspots.where((hotspot) {
@@ -182,7 +198,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
                 }).toList(),
               ),
 
-            //STREAM BUILDER PER I PUNTI DI RACCOLTA
+            //Stream builder per i punti di raccolta
             StreamBuilder<QuerySnapshot>(
               stream: _safePointsRef.snapshots(),
               builder: (context, snapshot) {
@@ -238,7 +254,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
               },
             ),
 
-            // 2. LAYER OSPEDALI (HOSPITALS) - BLU
+            // Layer ospedali
             StreamBuilder<QuerySnapshot>(
               stream: _hospitalsRef.snapshots(),
               builder: (context, snapshot) {
@@ -252,7 +268,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
 
                   return Marker(
                     point: LatLng(lat, lng),
-                    width: 50, // Un po' più grandi per visibilità
+                    width: 50,
                     height: 50,
                     child: GestureDetector(
                       onTap: () {
@@ -294,13 +310,13 @@ class _RealtimeMapState extends State<RealtimeMap> {
               },
             ),
 
-            // 2. StreamBuilder: Ascolta il database in tempo reale
+            // StreamBuilder: Ascolta il database in tempo reale
             StreamBuilder<QuerySnapshot>(
               stream: _firestore.snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const MarkerLayer(markers: []);
 
-                // Filtriamo e mappiamo i documenti
+                // Filtra e mappa i documenti
                 final List<Marker> markers = [];
 
                 for (var doc in snapshot.data!.docs) {
@@ -328,7 +344,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
                     timestamp = DateTime.tryParse(data['timestamp'].toString());
                   }
 
-                  // LOGICA DI SCADENZA PER "STO BENE"
+                  // Logica di scadenza per "Sto bene"
                   if (timestamp != null) {
                     final difference = DateTime.now()
                         .difference(timestamp)
@@ -339,7 +355,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
                     }
                   }
 
-                  // --- LOGICA DI VISUALIZZAZIONE E FILTRO ---
+                  // Logica di visualizzazione e filtro
                   Widget markerWidget;
 
                   bool isCritical = false;
@@ -387,7 +403,7 @@ class _RealtimeMapState extends State<RealtimeMap> {
               },
             ),
 
-            // 3. Marker Posizione Utente (Pallino Blu)
+            // Marker Posizione Utente (Pallino Blu)
             MarkerLayer(
               markers: [
                 Marker(
