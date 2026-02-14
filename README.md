@@ -1,8 +1,8 @@
 # SAfeRoute AI - Intelligent Emergency Navigation Module 
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.8+-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![License](https://img.shields.io/badge/License-GPL--3.0-red)
 
 ## Indice
 1. [Panoramica](#1-panoramica)
